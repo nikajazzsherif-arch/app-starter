@@ -1,0 +1,59 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build unsigned .ipa
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: List available iOS SDKs
+        run: xcodebuild -showsdks | grep -i iphoneos
+
+      - name: Build app
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project SwiftUIAppTemplate/SwiftUIAppTemplate.xcodeproj \
+            -scheme SwiftUIAppTemplate \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            ENABLE_BITCODE=NO \
+            build
+
+      - name: Package into .ipa
+        run: |
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::.app не найден после сборки"
+            exit 1
+          fi
+          echo "Найдено приложение: $APP"
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry "SwiftUIAppTemplate.ipa" Payload
+          ls -lh SwiftUIAppTemplate.ipa
+
+      - name: Upload .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-ipa
+          path: SwiftUIAppTemplate.ipa
+          retention-days: 30
