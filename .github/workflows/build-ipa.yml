@@ -57,3 +57,31 @@ jobs:
           name: unsigned-ipa
           path: SwiftUIAppTemplate.ipa
           retention-days: 30
+
+  release:
+    name: Publish .ipa to Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: unsigned-ipa
+          path: dist
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          gh release create "$TAG" \
+            dist/SwiftUIAppTemplate.ipa \
+            --title "Сборка #${GITHUB_RUN_NUMBER}" \
+            --notes "Автосборка из main. Установить через SideStore: скопируй ссылку на файл и нажми «+»." \
+            || gh release upload "$TAG" dist/SwiftUIAppTemplate.ipa --clobber
+          echo ""
+          echo "=== Ссылка для SideStore ==="
+          gh release view "$TAG" --json assets --jq '.assets[0].browserDownloadUrl'
